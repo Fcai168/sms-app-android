@@ -36,4 +36,4 @@ jobs:
           gh release create "apk-$(date +%Y%m%d-%H%M%S)" app/build/outputs/apk/debug/*.apk \
             --title "SmsApp APK $(date +%Y-%m-%d)" --generate-notes --prerelease -R Fcai168/sms-app-android
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.SMS_RELEASE_TOKEN }}
