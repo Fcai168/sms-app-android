@@ -1,8 +1,13 @@
 package com.fcai.smsapp;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ServiceInfo;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -24,12 +29,16 @@ import java.net.URL;
 public class SendService extends Service {
 
     private static final String SERVER = "https://6109.cn.mt/api/smsq";
+    private static final String CHAN = "sms_service";
+    private static final int NOTI = 1001;
     private static volatile boolean running = false;
+    private static long lastStartAt = 0;  // 本次服务启动时间
     private Thread worker;
     private Handler mainHandler;
     private SharedPreferences sp;
 
     public static boolean isRunning() { return running; }
+    public static long lastStartAt() { return lastStartAt; }
 
     @Override
     public void onCreate() {
@@ -40,12 +49,41 @@ public class SendService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (running) return START_STICKY;
-        running = true;
-        toast("群发服务已启动");
-        worker = new Thread(this::loop);
-        worker.start();
+        if (!running) {
+            running = true;
+            lastStartAt = System.currentTimeMillis();
+            toast("群发服务已启动");
+        }
+        startFg();
+        if (worker == null || !worker.isAlive()) {
+            worker = new Thread(this::loop);
+            worker.start();
+        }
         return START_STICKY;
+    }
+
+    /** 常驻通知(前台服务), 系统不敢杀 */
+    private void startFg() {
+        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        Notification.Builder nb;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel ch = new NotificationChannel(CHAN, "群发服务",
+                    NotificationManager.IMPORTANCE_MIN);
+            nm.createNotificationChannel(ch);
+            nb = new Notification.Builder(this, CHAN);
+        } else {
+            nb = new Notification.Builder(this);
+        }
+        Notification n = nb.setSmallIcon(android.R.drawable.stat_notify_chat)
+                .setContentTitle("短信群发服务运行中")
+                .setContentText("正在自动领取并发送任务")
+                .setOngoing(true)
+                .build();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTI, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+        } else {
+            startForeground(NOTI, n);
+        }
     }
 
     @Override
