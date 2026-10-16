@@ -30,3 +30,10 @@ jobs:
         with:
           name: sms-app-apk
           path: app/build/outputs/apk/debug/*.apk
+
+      - name: Publish to GitHub Release（公开下载链接，免权限）
+        run: |
+          gh release create "apk-$(date +%Y%m%d-%H%M%S)" app/build/outputs/apk/debug/*.apk \
+            --title "SmsApp APK $(date +%Y-%m-%d)" --generate-notes --prerelease -R Fcai168/sms-app-android
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
