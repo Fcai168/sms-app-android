@@ -114,13 +114,20 @@ public class MainActivity extends Activity {
 
     private void updateUI() {
         boolean running = SendService.isRunning();
-        tvStatus.setText(running ? "运行中" : "已停止");
-        dotStatus.setBackgroundResource(running ? R.drawable.dot_green : R.drawable.dot_off);
-        if (running) {
+        boolean broken = running && SendService.netBroken();
+        tvStatus.setText(broken ? "网络中断" : (running ? "运行中" : "已停止"));
+        if (broken) {
+            dotStatus.setBackgroundResource(R.drawable.dot_warn);
+            tvBadge.setText("自动重连中");
+            tvBadge.setTextColor(0xFFFFC53D);
+            tvBadge.setBackgroundResource(R.drawable.badge_warn);
+        } else if (running) {
+            dotStatus.setBackgroundResource(R.drawable.dot_green);
             tvBadge.setText("服务在线");
             tvBadge.setTextColor(0xFF7DFFB8);
             tvBadge.setBackgroundResource(R.drawable.badge_green);
         } else {
+            dotStatus.setBackgroundResource(R.drawable.dot_off);
             tvBadge.setText("服务离线");
             tvBadge.setTextColor(0xFFFF9E9E);
             tvBadge.setBackgroundResource(R.drawable.badge_red);

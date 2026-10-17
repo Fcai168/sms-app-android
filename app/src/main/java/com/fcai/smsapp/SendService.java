@@ -33,12 +33,19 @@ public class SendService extends Service {
     private static final int NOTI = 1001;
     private static volatile boolean running = false;
     private static long lastStartAt = 0;  // 本次服务启动时间
+    private static volatile long lastOkAt = 0;    // 最近一次网络成功
+    private static volatile long lastErrAt = 0;   // 最近一次网络错误
     private Thread worker;
     private Handler mainHandler;
     private SharedPreferences sp;
 
     public static boolean isRunning() { return running; }
     public static long lastStartAt() { return lastStartAt; }
+
+    /** 网络是否中断: 最近有错误且错误比成功新, 且超过 30 秒没恢复 */
+    public static boolean netBroken() {
+        return lastErrAt > lastOkAt && (System.currentTimeMillis() - lastErrAt > 30000);
+    }
 
     @Override
     public void onCreate() {
@@ -89,6 +96,8 @@ public class SendService extends Service {
     @Override
     public void onDestroy() {
         running = false;
+        lastErrAt = 0;
+        lastOkAt = 0;
         if (worker != null) worker.interrupt();
         toast("群发服务已停止");
         super.onDestroy();
@@ -115,6 +124,7 @@ public class SendService extends Service {
             try {
                 register(devId);
                 JSONObject claim = httpPost("/claim", new JSONObject().put("deviceId", devId));
+                lastOkAt = System.currentTimeMillis();
                 if (!claim.optBoolean("success")) { sleep(5000); continue; }
                 JSONObject task = claim.optJSONObject("task");
                 if (task == null) { sleep(5000); continue; }  // 无任务
@@ -134,6 +144,7 @@ public class SendService extends Service {
 
                 sleep(3000);  // 防风控间隔
             } catch (Exception e) {
+                lastErrAt = System.currentTimeMillis();
                 appendLog("错误: " + e.getMessage());
                 sleep(5000);
             }
