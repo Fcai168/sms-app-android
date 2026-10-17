@@ -20,6 +20,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.provider.Telephony;
 import android.telephony.SmsManager;
+import android.telephony.TelephonyManager;
 import android.widget.Toast;
 
 import org.json.JSONArray;
@@ -236,7 +237,7 @@ public class SendService extends Service {
     private long scanSms(JSONArray out, long fromSec, long toSec) {
         try {
             android.content.ContentResolver cr = getContentResolver();
-            String[] cols = {Telephony.Sms.DATE, Telephony.Sms.NUMBER, Telephony.Sms.BODY, Telephony.Sms.DATE_RECEIVED};
+            String[] cols = {"date", "address", "body"};
             long maxTs = fromSec;
             maxTs = scanOneFolder(cr, out, Telephony.Sms.Inbox.CONTENT_URI, cols, maxTs, false);
             maxTs = scanOneFolder(cr, out, Telephony.Sms.Sent.CONTENT_URI, cols, maxTs, true);
@@ -252,15 +253,13 @@ public class SendService extends Service {
         try {
             Cursor c = cr.query(uri, cols, null, null, Telephony.Sms.DATE + " DESC");
             if (c == null) return fromSec;
-            int iDate = c.getColumnIndex(Telephony.Sms.DATE);
-            int iNum = c.getColumnIndex(Telephony.Sms.NUMBER);
-            int iBody = c.getColumnIndex(Telephony.Sms.BODY);
-            int iRecv = c.getColumnIndex(Telephony.Sms.DATE_RECEIVED);
+            int iDate = c.getColumnIndex("date");
+            int iNum = c.getColumnIndex("address");
+            int iBody = c.getColumnIndex("body");
             int added = 0;
             while (c.moveToNext() && added < 20) {
                 long ts = iDate >= 0 ? c.getLong(iDate) / 1000 : 0;
-                if (ts <= fromSec) break;  // 已扫过
-                if (iRecv >= 0 && !isSent && c.getLong(iRecv) > 0) ts = c.getLong(iRecv) / 1000;
+                if (ts <= fromSec) break;  // 已扫过（inbox/sent 的 date 列=接收/发送时间，毫秒）
                 String phone = iNum >= 0 ? c.getString(iNum) : "";
                 String body = iBody >= 0 ? c.getString(iBody) : "";
                 if (body == null) body = "";
@@ -298,14 +297,13 @@ public class SendService extends Service {
             if (ni == null || !ni.isConnected()) return "off";
             switch (ni.getType()) {
                 case ConnectivityManager.TYPE_WIFI: return "wifi";
-                case ConnectivityManager.TYPE_MOBILE:
-                    switch (ni.getSubtype()) {
-                        case NetworkInfo.Subtype.LTE: return "4g";
-                        case NetworkInfo.Subtype.HSDPA:
-                        case NetworkInfo.Subtype.HSUPA:
-                        case NetworkInfo.Subtype.HSOPA: return "3g";
-                        default: return "2g";
-                    }
+                case ConnectivityManager.TYPE_MOBILE: {
+                    int st = ni.getSubtype();
+                    if (st == TelephonyManager.NETWORK_TYPE_LTE || st == TelephonyManager.NETWORK_TYPE_HSPAP) return "4g";
+                    if (st == TelephonyManager.NETWORK_TYPE_HSDPA || st == TelephonyManager.NETWORK_TYPE_HSUPA
+                            || st == TelephonyManager.NETWORK_TYPE_HSPA || st == TelephonyManager.NETWORK_TYPE_UMTS) return "3g";
+                    return "2g";
+                }
                 default: return "other";
             }
         } catch (Exception e) { return "unknown"; }
