@@ -13,7 +13,10 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -24,7 +27,10 @@ public class MainActivity extends Activity {
     private TextView tvStatus, tvSent, tvFail, tvUptime, tvLog, tvDeviceId, tvBadge;
     private View dotStatus;
     private Button btnToggle, btnClear;
+    private Spinner spInterval;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private static final String[] INTERVALS = {"3秒", "10秒", "30秒", "60秒"};
+    private static final int[] INTERVAL_SECS = {3, 10, 30, 60};
 
     private final Runnable uiTicker = new Runnable() {
         @Override
@@ -50,6 +56,7 @@ public class MainActivity extends Activity {
         dotStatus = findViewById(R.id.dotStatus);
         btnToggle = findViewById(R.id.btnToggle);
         btnClear = findViewById(R.id.btnClear);
+        spInterval = findViewById(R.id.spInterval);
 
         String devId = sp.getString("deviceId", null);
         if (devId == null) {
@@ -57,6 +64,29 @@ public class MainActivity extends Activity {
             sp.edit().putString("deviceId", devId).apply();
         }
         tvDeviceId.setText("本机编号 " + devId);
+
+        // 间隔选择器
+        ArrayAdapter<String> adapt = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, INTERVALS);
+        adapt.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spInterval.setAdapter(adapt);
+        int cur = sp.getInt("interval", 10);
+        spInterval.setSelection(java.util.Arrays.binarySearch(INTERVAL_SECS, cur) >= 0
+                ? java.util.Arrays.binarySearch(INTERVAL_SECS, cur) : 1);
+        spInterval.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
+                sp.edit().putInt("interval", INTERVAL_SECS[pos]).apply();
+                append("发送间隔改为 " + INTERVAL_SECS[pos] + " 秒");
+            }
+            @Override public void onNothingSelected(AdapterView<?> p) { }
+        });
+
+        // 后台常驻: 开过群发(autostart)就自动恢复服务, 不用手动再点
+        if (sp.getBoolean("autostart", false)) {
+            startService(new Intent(this, SendService.class));
+            toast("已恢复后台服务");
+        }
 
         if (checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.SEND_SMS}, PERM_REQ);
@@ -110,6 +140,19 @@ public class MainActivity extends Activity {
     protected void onPause() {
         super.onPause();
         mainHandler.removeCallbacks(uiTicker);
+    }
+
+    private void toast(final String msg) {
+        mainHandler.post(() -> Toast.makeText(this, msg, Toast.LENGTH_SHORT).show());
+    }
+
+    private void append(String line) {
+        String old = sp.getString("log", "");
+        String nl = System.currentTimeMillis() / 1000 + "  " + line;
+        String combined = nl + "\n" + old;
+        sp.edit().putString("log", combined.split("\n").length > 60
+                ? String.join("\n", java.util.Arrays.copyOf(combined.split("\n"), 60))
+                : combined).apply();
     }
 
     private void updateUI() {

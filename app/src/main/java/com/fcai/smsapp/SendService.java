@@ -142,7 +142,7 @@ public class SendService extends Service {
                 if (ok) { sp.edit().putInt("sent", sent + 1).apply(); appendLog("✅ 已发送 #" + id); }
                 else { sp.edit().putInt("fail", fail + 1).apply(); appendLog("❌ 发送失败 #" + id); }
 
-                sleep(3000);  // 防风控间隔
+                sleep(sp.getInt("interval", 10) * 1000L);  // 防风控间隔(界面可调)
             } catch (Exception e) {
                 lastErrAt = System.currentTimeMillis();
                 appendLog("错误: " + e.getMessage());
