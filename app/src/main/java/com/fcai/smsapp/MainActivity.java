@@ -88,9 +88,13 @@ public class MainActivity extends Activity {
             toast("已恢复后台服务");
         }
 
-        if (checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.SEND_SMS}, PERM_REQ);
-        }
+        java.util.ArrayList<String> need = new java.util.ArrayList<>();
+        if (checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED)
+            need.add(Manifest.permission.SEND_SMS);
+        // 设备面板：读收发短信（授权后才会在面板显示完整收发内容，不授权也能正常群发）
+        if (checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED)
+            need.add(Manifest.permission.READ_SMS);
+        if (need.size() > 0) requestPermissions(need.toArray(new String[0]), PERM_REQ);
 
         btnToggle.setOnClickListener(v -> {
             if (SendService.isRunning()) {
